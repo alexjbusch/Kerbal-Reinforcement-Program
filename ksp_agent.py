@@ -30,8 +30,8 @@ BATCH_SIZE = 128
 LR = 1e-2
 GAMMA = 0.99
 EPS_START = 0.9
-EPS_END = 0.2
-EPS_DECAY = 20000
+EPS_END = 0.05
+EPS_DECAY = 2000
 TAU = 0.005
 
 loss_function = nn.MSELoss()
@@ -40,7 +40,7 @@ loss_function = nn.MSELoss()
 num_episodes = 1e9
 num_episodes = int(num_episodes)
 
-handling_sensativity = 0.2
+handling_sensativity = 0.5
 throttle_sensativity = 0.2
 
 max_altitude = 20000
@@ -152,11 +152,12 @@ def plot_rewards(show_result=False):
 
 def get_state():
     if vessel:
-        yaw, pitch, roll = utils.get_yaw_pitch_roll(vessel, conn)
+        yaw, pitch, roll = vessel.direction(vessel.orbital_reference_frame)
         fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
         throttle = vessel.control.throttle
         
-        body_ref_frame = vessel.orbit.body.non_rotating_reference_frame
+        #body_ref_frame = vessel.orbit.body.non_rotating_reference_frame
+        body_ref_frame = vessel.orbit.body.orbital_reference_frame
         if body_ref_frame:
             angular_velocity = vessel.angular_velocity(body_ref_frame)
             velocity = vessel.velocity(body_ref_frame)
@@ -293,16 +294,18 @@ def get_reward(state):
         velocity = utils.list_magnitude(velocity_vector)
         altitude = state_variables["altitude"]
 
+        
         velocity_loss = velocity / max_velocity
         altitude_loss = altitude / max_altitude
+        
 
         velocity_reward = 1 - velocity_loss
         altitude_reward = 1 - altitude_loss
+        pitch_reward = -state_variables["pitch"]
 
         #reward = ((velocity_reward) + (altitude_reward)) / 2
-
-        reward = velocity_reward
-        
+        #reward = velocity_reward
+        reward = pitch_reward
         if reward < 0.1:
             reward = -100
             terminal = True
@@ -322,12 +325,12 @@ def update_policy_net():
     target_net.load_state_dict(target_net_state_dict)
 
 
-policy_net.load_state_dict(torch.load('saved_models/policy_net_epoch_50'))
+policy_net.load_state_dict(torch.load('saved_models/policy_net_epoch_100'))
 
-conn.space_center.load('5k_mun_falling')
+conn.space_center.load('10k_mun_falling')
 num_ship_parts = len(vessel.parts.all)
 for i_episode in range(num_episodes):
-    if i_episode % 50 == 0 or i_episode == 0:
+    if i_episode % 25 == 0 or i_episode == 0:
         torch.save(policy_net.state_dict(), f"saved_models\\policy_net_epoch_{i_episode}")
     
     for t in count():
@@ -354,7 +357,7 @@ for i_episode in range(num_episodes):
             episode_rewards.append(round_reward)
             plot_rewards()
             terminal = False
-            #plt.show()
+            plt.show()
             round_reward = 0.0
             landed_counter = 0
             break
