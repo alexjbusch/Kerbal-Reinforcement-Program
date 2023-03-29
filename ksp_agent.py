@@ -27,12 +27,12 @@ import utils
 model_to_load = 'saved_models/policy_net_epoch_100'
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 LR = 1e-2
 GAMMA = 0.99
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 5000
+EPS_DECAY = 1000
 TAU = 0.005
 REPLAY_MEMORY_SIZE = 10000
 
@@ -75,26 +75,29 @@ num_observations= len(observations)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DQN(nn.Module):
-    def __init__(self, num_observations, num_actions):
+
+    def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(num_observations, 128)
-        self.layer2 = nn.Linear(128, num_actions)
+        self.layer1 = nn.Linear(n_observations, 128)
+        self.layer2 = nn.Linear(128, 128)
+        self.layer3 = nn.Linear(128, n_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
         x = F.relu(self.layer1(x))
-        x = self.layer2(x)
-        return x
+        x = F.relu(self.layer2(x))
+        return self.layer3(x)
 
 
 
 policy_net = DQN(num_observations, num_actions).to(device)
 target_net = DQN(num_observations, num_actions).to(device)
 
+"""
 if model_to_load not in {None, ""}:
     policy_net.load_state_dict(torch.load(model_to_load))
-
+"""
 #target_net.load_state_dict(policy_net.state_dict())
 
 
@@ -239,63 +242,77 @@ def do_action(action):
 
 
 
-def optimize_model():
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
 
+
+def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
-    batch = memory.sample(BATCH_SIZE)
-        
-    state_batch, reward_batch, next_state_batch, terminal_batch = zip(*batch)
+    transitions = memory.sample(BATCH_SIZE)
 
-    state_batch = torch.stack(tuple(state for state in state_batch))
-    reward_batch = torch.stack(reward_batch)
-    next_state_batch = torch.stack(tuple(state for state in next_state_batch))
 
-    #print(f"state_batch: {state_batch.shape}")
-    #print(f"reward_batch: {reward_batch.shape}")
-    #print(f"next_state_batch: {next_state_batch.shape}")
-    #print(f"terminal_batch: {len(terminal_batch)}")
+    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
+    # detailed explanation). This converts batch-array of Transitions
+    # to Transition of batch-arrays.
+    batch = Transition(*zip(*transitions))
+
+
+
+    # Compute a mask of non-final states and concatenate the batch elements
+    # (a final state would've been the one after which simulation ended)
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                          batch.next_state)), device=device, dtype=torch.bool)
+
+
+    non_final_next_states = torch.cat([s[None] for s in batch.next_state
+                                                if s is not None])
+
+
+    #import pdb; pdb.set_trace()
+    #print(non_final_next_states.shape)
+    #print(non_final_next_states)
+
+    state_batch = torch.cat(batch.state, dim=0)
+    state_batch = state_batch.view(-1,num_observations)
     
-    if torch.cuda.is_available():
-        state_batch = state_batch.cuda()
-        reward_batch = reward_batch.cuda()
-        next_state_batch = next_state_batch.cuda()
+    action_batch = torch.cat(batch.action)
+    reward_batch = torch.cat(batch.reward)
 
-    q_values = policy_net(state_batch)
-    policy_net.eval()
+    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+    # columns of actions taken. These are the actions which would've been taken
+    # for each batch state according to policy_net
+
+    #print(f"action_batch: {action_batch.shape}")
+    #64x1
+    #print(f"state_batch: {state_batch.shape}")
+    #64x11
+    state_action_values = policy_net(state_batch).gather(1, action_batch)
 
 
-    with torch.no_grad():            
-        next_prediction_batch = target_net(next_state_batch)
-        #print(next_prediction_batch.shape)
-        next_prediction_batch = next_prediction_batch.max(1)
-        #print(next_prediction_batch)
-        next_prediction_batch = next_prediction_batch[0]
 
-    y_batch = torch.zeros((BATCH_SIZE, 1))
-    for i in range(BATCH_SIZE):
-        if terminal_batch[i]:
-            y_batch[i] = reward_batch[i]
-        else:
-            y_batch[i] = reward_batch[i] + GAMMA * next_prediction_batch[i]
+    # Compute V(s_{t+1}) for all next states.
+    # Expected values of actions for non_final_next_states are computed based
+    # on the "older" target_net; selecting their best reward with max(1)[0].
+    # This is merged based on the mask, such that we'll have either the expected
+    # state value or 0 in case the state was final.
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    with torch.no_grad():
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0]
+    # Compute the expected Q values
+    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
-    if torch.cuda.is_available():
-        y_batch = y_batch.cuda()
-        q_values = q_values.cuda()
-    """
-    y_batch = torch.cat(
-        tuple(reward if terminal else reward + GAMMA * prediction for reward, terminal, prediction in
-              zip(reward_batch, terminal_batch, next_prediction_batch)))
-    """
+    
+
+    # Compute Huber loss
+    criterion = nn.SmoothL1Loss()
+    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    # Optimize the model
     optimizer.zero_grad()
-    #print(q_values.shape, y_batch.shape)
-    loss = loss_function(q_values, y_batch.float())
     loss.backward()
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
-
-
 
 def get_reward(state):
     terminal = False
@@ -320,6 +337,12 @@ def get_reward(state):
         state_variables = {key:value.item() for key,value in zip(observations,state)}
         velocity_vector = [state_variables["velocity_x"],state_variables["velocity_y"],state_variables["velocity_z"]]
         velocity = utils.list_magnitude(velocity_vector)
+
+        angular_velocity_vector = [state_variables["angular_velocity_x"],state_variables["angular_velocity_y"],state_variables["angular_velocity_z"]]
+        angular_velocity = utils.list_magnitude(angular_velocity_vector)
+        reward = angular_velocity
+
+        
         altitude = state_variables["altitude"]
 
         
@@ -332,9 +355,10 @@ def get_reward(state):
         pitch_reward = -state_variables["pitch"]
 
         #reward = ((velocity_reward) + (altitude_reward)) / 2
-        #reward = velocity_reward
-        reward = pitch_reward
-        if reward < 0.6:
+        reward = velocity_reward
+        #reward = pitch_reward
+        
+        if reward < 0.1:
             reward = -100
             terminal = True
         
@@ -355,7 +379,7 @@ def update_policy_net():
 
 
 
-conn.space_center.load('10k_mun_falling')
+
 num_ship_parts = len(vessel.parts.all)
 
 # max was 500k
@@ -364,26 +388,28 @@ frames_seen = 0
 for i_episode in range(num_episodes):
     if i_episode % 25 == 0 or i_episode == 0:
         torch.save(policy_net.state_dict(), f"saved_models\\policy_net_epoch_{i_episode}")
-    
+    conn.space_center.load('10k_mun_falling')
     for t in count():
         frames_seen += 1
         
         state = get_state()
         action = select_action(state)
         do_action(action)
-
         next_state = get_state()
-
-            
         reward, terminal = get_reward(next_state)
+
+
+
+        
         if frames_seen % 10 == 0:
             print(f"reward: {reward}   eps: {current_epsilon}, frame: {round(frames_seen/1000000, 5)}M")
         round_reward += reward
         reward = torch.tensor([reward], device=device)
         # Store the transition in memory
 
-
-        memory.push(state, reward, next_state, terminal)
+        if terminal:
+            next_state = None
+        memory.push(state, action, next_state, reward)
         
         optimize_model()
         update_policy_net()
@@ -396,4 +422,4 @@ for i_episode in range(num_episodes):
             round_reward = 0.0
             landed_counter = 0
             break
-    conn.space_center.load('10k_mun_falling')
+    
