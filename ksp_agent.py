@@ -24,11 +24,11 @@ import numpy as np
 
 import utils
 
-model_to_load = 'saved_models/policy_net_epoch_100'
+model_to_load = ''
 
 
-BATCH_SIZE = 64
-LR = 1e-2
+BATCH_SIZE = 128
+LR = 1e-4
 GAMMA = 0.99
 EPS_START = 0.99
 EPS_END = 0.05
@@ -57,7 +57,7 @@ steps_done = 0
 landed_counter = 0
 current_epsilon = EPS_START
 
-observations = ["yaw","pitch","roll","altitude","fuel",
+observations = ["prograde","antiradial","normal","altitude","fuel",
                  "angular_velocity_x","angular_velocity_y","angular_velocity_z",
                  "velocity_x","velocity_y","velocity_z"]
 actions = ["yaw_up","yaw_down","pitch_up","pitch_down","roll_up","roll_down","throttle_up","throttle_down","do_nothing"]
@@ -110,8 +110,6 @@ optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
 
 conn = krpc.connect(name='ksp_agent')
 vessel = conn.space_center.active_vessel
-
-num_ship_parts = len(vessel.parts.all)
 
 #vessel.control.input_mode = conn.space_center.ControlInputMode.override
 
@@ -169,7 +167,7 @@ def plot_rewards(show_result=False):
 
 def get_state():
     if vessel:
-        yaw, pitch, roll = vessel.direction(vessel.orbital_reference_frame)
+        prograde, antiradial, normal = vessel.direction(vessel.orbital_reference_frame)
         fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
         throttle = vessel.control.throttle
         
@@ -183,7 +181,9 @@ def get_state():
             velocity = 0
         altitude = vessel.flight().surface_altitude
 
-        state = torch.FloatTensor([yaw,pitch,roll,altitude,fuel,*angular_velocity,*velocity]).to(device)
+        state = torch.FloatTensor([prograde, antiradial, normal ,altitude,fuel,*angular_velocity,*velocity]).to(device)
+
+        #print(prograde, antiradial, normal)
 
     else:
         state = torch.zeroes(num_observations).to(device)
@@ -321,12 +321,14 @@ def get_reward(state):
     parts_destroyed = num_ship_parts - len(vessel.parts.all)
 
     #reward = parts_destroyed * -20
-    if vessel.situation == conn.space_center.VesselSituation.landed:
-        global landed_counter
+    global landed_counter
+    if vessel.situation == conn.space_center.VesselSituation.landed:   
         landed_counter += 1
         if landed_counter > 5:
             terminal = True
             reward = 1000
+    else:
+        landed_counter = 0
 
     if parts_destroyed > 0:
         terminal = True
@@ -352,7 +354,7 @@ def get_reward(state):
 
         velocity_reward = 1 - velocity_loss
         altitude_reward = 1 - altitude_loss
-        pitch_reward = -state_variables["pitch"]
+        pitch_reward = -state_variables["prograde"]
 
         #reward = ((velocity_reward) + (altitude_reward)) / 2
         reward = velocity_reward
@@ -380,7 +382,7 @@ def update_policy_net():
 
 
 
-num_ship_parts = len(vessel.parts.all)
+
 
 # max was 500k
 frames_seen = 0
@@ -389,12 +391,14 @@ for i_episode in range(num_episodes):
     if i_episode % 25 == 0 or i_episode == 0:
         torch.save(policy_net.state_dict(), f"saved_models\\policy_net_epoch_{i_episode}")
     conn.space_center.load('10k_mun_falling')
+    # this must be called AFTER the save is loaded or the num_parts will be 0
+    num_ship_parts = len(vessel.parts.all)
     for t in count():
         frames_seen += 1
         
         state = get_state()
         action = select_action(state)
-        do_action(action)
+        #do_action(action)
         next_state = get_state()
         reward, terminal = get_reward(next_state)
 
