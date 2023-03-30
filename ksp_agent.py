@@ -167,7 +167,7 @@ def plot_rewards(show_result=False):
 
 def get_state():
     if vessel:
-        prograde, antiradial, normal = vessel.direction(vessel.orbital_reference_frame)
+        antiradial, prograde, normal = vessel.direction(vessel.orbital_reference_frame)
         fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
         throttle = vessel.control.throttle
         
