@@ -2,6 +2,7 @@ import math
 import time
 import krpc
 
+
 import random
 import matplotlib
 import matplotlib.pyplot as plt
@@ -27,11 +28,11 @@ import utils
 model_to_load = ''
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 LR = 1e-4
 GAMMA = 0.99
 EPS_START = 0.99
-EPS_END = 0.05
+EPS_END = 0.1
 EPS_DECAY = 1000
 TAU = 0.005
 REPLAY_MEMORY_SIZE = 10000
@@ -42,8 +43,8 @@ loss_function = nn.SmoothL1Loss()
 num_episodes = 1e9
 num_episodes = int(num_episodes)
 
-handling_sensativity = 0.5
-throttle_sensativity = 0.2
+handling_sensativity = 0.25
+throttle_sensativity = 0.3
 
 max_altitude = 20000
 max_velocity = 200
@@ -57,9 +58,10 @@ steps_done = 0
 landed_counter = 0
 current_epsilon = EPS_START
 
-observations = ["prograde","antiradial","normal","altitude","fuel",
+observations = ["angle_of_attack","sideslip_angle","altitude","fuel",
                  "angular_velocity_x","angular_velocity_y","angular_velocity_z",
-                 "velocity_x","velocity_y","velocity_z"]
+                 "velocity_x","velocity_y","velocity_z",
+                "rotation_x","rotation_y","rotation_z","rotation_w"]
 actions = ["yaw_up","yaw_down","pitch_up","pitch_down","roll_up","roll_down","throttle_up","throttle_down","do_nothing"]
 action_space = [action_int for action_int in range(len(actions))]
 Transition = namedtuple('Transition',
@@ -78,9 +80,9 @@ class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, n_actions)
+        self.layer1 = nn.Linear(n_observations, 256)
+        self.layer2 = nn.Linear(256, 256)
+        self.layer3 = nn.Linear(256, n_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -167,23 +169,24 @@ def plot_rewards(show_result=False):
 
 def get_state():
     if vessel:
-        antiradial, prograde, normal = vessel.direction(vessel.orbital_reference_frame)
+        #antiradial, prograde, normal = vessel.direction(vessel.orbital_reference_frame)
         fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
         throttle = vessel.control.throttle
+
+        ref_frame = vessel.orbit.body.reference_frame
+        flight = vessel.flight(ref_frame)
         
-        #body_ref_frame = vessel.orbit.body.non_rotating_reference_frame
-        body_ref_frame = vessel.orbit.body.orbital_reference_frame
-        if body_ref_frame:
-            angular_velocity = vessel.angular_velocity(body_ref_frame)
-            velocity = vessel.velocity(body_ref_frame)
-        else:
-            anguar_velocity = 0
-            velocity = 0
-        altitude = vessel.flight().surface_altitude
+        angle_of_attack = flight.angle_of_attack
+        sideslip_angle = flight.sideslip_angle
 
-        state = torch.FloatTensor([prograde, antiradial, normal ,altitude,fuel,*angular_velocity,*velocity]).to(device)
 
-        #print(prograde, antiradial, normal)
+        angular_velocity = vessel.angular_velocity(ref_frame)
+        velocity = vessel.velocity(ref_frame)
+        rotation = flight.rotation
+        altitude = flight.surface_altitude
+
+        #state = torch.FloatTensor([prograde, antiradial, normal ,altitude,fuel,*angular_velocity,*velocity]).to(device)
+        state = torch.FloatTensor([angle_of_attack,sideslip_angle,altitude,fuel,*angular_velocity,*velocity, *rotation]).to(device)
 
     else:
         state = torch.zeroes(num_observations).to(device)
@@ -354,13 +357,14 @@ def get_reward(state):
 
         velocity_reward = 1 - velocity_loss
         altitude_reward = 1 - altitude_loss
-        pitch_reward = -state_variables["prograde"]
+        #pitch_reward = -state_variables["prograde"]
 
-        #reward = ((velocity_reward) + (altitude_reward)) / 2
-        reward = velocity_reward
+        reward = ((velocity_reward) + (altitude_reward)) / 2
+        #reward = velocity_reward
+        #reward = (reward + 1)**10
         #reward = pitch_reward
         
-        if reward < 0.1:
+        if reward < 0.4:
             reward = -100
             terminal = True
         
@@ -393,12 +397,16 @@ for i_episode in range(num_episodes):
     conn.space_center.load('10k_mun_falling')
     # this must be called AFTER the save is loaded or the num_parts will be 0
     num_ship_parts = len(vessel.parts.all)
+
+    vessel.control.sas_mode = conn.space_center.SASMode.retrograde
+
     for t in count():
         frames_seen += 1
         
         state = get_state()
         action = select_action(state)
-        #do_action(action)
+        do_action(action)
+        time.sleep(0.05)
         next_state = get_state()
         reward, terminal = get_reward(next_state)
 
