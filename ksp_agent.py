@@ -28,12 +28,12 @@ import utils
 model_to_load = ''
 
 
-BATCH_SIZE = 32
+BATCH_SIZE = 20
 LR = 1e-4
 GAMMA = 0.99
 EPS_START = 0.99
 EPS_END = 0.1
-EPS_DECAY = 1000
+EPS_DECAY = 500
 TAU = 0.005
 REPLAY_MEMORY_SIZE = 10000
 
@@ -43,11 +43,13 @@ loss_function = nn.SmoothL1Loss()
 num_episodes = 1e9
 num_episodes = int(num_episodes)
 
-handling_sensativity = 0.25
+handling_sensativity = 0.2
 throttle_sensativity = 0.3
 
-max_altitude = 20000
-max_velocity = 200
+max_altitude = 600
+max_velocity = 130
+
+
 
 
 episode_durations = []
@@ -58,11 +60,17 @@ steps_done = 0
 landed_counter = 0
 current_epsilon = EPS_START
 
-observations = ["angle_of_attack","sideslip_angle","altitude","fuel",
+observations = ["altitude","fuel",
                  "angular_velocity_x","angular_velocity_y","angular_velocity_z",
                  "velocity_x","velocity_y","velocity_z",
                 "rotation_x","rotation_y","rotation_z","rotation_w"]
+
+observations = ["throttle","altitude",
+                "velocity_x","velocity_y","velocity_z",
+                "rotation_x","rotation_y","rotation_z","rotation_w"]
 actions = ["yaw_up","yaw_down","pitch_up","pitch_down","roll_up","roll_down","throttle_up","throttle_down","do_nothing"]
+#actions = ["throttle_up","throttle_down"]
+
 action_space = [action_int for action_int in range(len(actions))]
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -77,12 +85,11 @@ num_observations= len(observations)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DQN(nn.Module):
-
     def __init__(self, n_observations, n_actions):
-        super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 256)
-        self.layer2 = nn.Linear(256, 256)
-        self.layer3 = nn.Linear(256, n_actions)
+            super(DQN, self).__init__()
+            self.layer1 = nn.Linear(n_observations, 512)
+            self.layer2 = nn.Linear(512, 512)
+            self.layer3 = nn.Linear(512, n_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -170,7 +177,8 @@ def plot_rewards(show_result=False):
 def get_state():
     if vessel:
         #antiradial, prograde, normal = vessel.direction(vessel.orbital_reference_frame)
-        fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
+        #fuel = vessel.resources_in_decouple_stage(vessel.control.current_stage-1).amount("LiquidFuel")
+        
         throttle = vessel.control.throttle
 
         ref_frame = vessel.orbit.body.reference_frame
@@ -186,7 +194,12 @@ def get_state():
         altitude = flight.surface_altitude
 
         #state = torch.FloatTensor([prograde, antiradial, normal ,altitude,fuel,*angular_velocity,*velocity]).to(device)
-        state = torch.FloatTensor([angle_of_attack,sideslip_angle,altitude,fuel,*angular_velocity,*velocity, *rotation]).to(device)
+        #state = torch.FloatTensor([angle_of_attack,sideslip_angle,altitude,fuel,*angular_velocity,*velocity, *rotation]).to(device)
+        state = torch.FloatTensor([throttle,altitude,
+                                   *velocity,
+                                   *rotation]).to(device)
+
+        #print(state)
 
     else:
         state = torch.zeroes(num_observations).to(device)
@@ -243,6 +256,13 @@ def do_action(action):
         case 8:
             pass
 
+    """
+        case 0:
+            vessel.control.throttle += throttle_sensativity
+        case 1:
+            vessel.control.throttle -= throttle_sensativity
+    """
+
 
 
 Transition = namedtuple('Transition',
@@ -276,8 +296,12 @@ def optimize_model():
     #print(non_final_next_states.shape)
     #print(non_final_next_states)
 
-    state_batch = torch.cat(batch.state, dim=0)
+    
+    state_batch = torch.cat(batch.state)
     state_batch = state_batch.view(-1,num_observations)
+    
+    assert torch.equal(batch.state[0],state_batch[0])
+
     
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
@@ -343,9 +367,11 @@ def get_reward(state):
         velocity_vector = [state_variables["velocity_x"],state_variables["velocity_y"],state_variables["velocity_z"]]
         velocity = utils.list_magnitude(velocity_vector)
 
-        angular_velocity_vector = [state_variables["angular_velocity_x"],state_variables["angular_velocity_y"],state_variables["angular_velocity_z"]]
-        angular_velocity = utils.list_magnitude(angular_velocity_vector)
-        reward = angular_velocity
+
+
+        #angular_velocity_vector = [state_variables["angular_velocity_x"],state_variables["angular_velocity_y"],state_variables["angular_velocity_z"]]
+        #angular_velocity = utils.list_magnitude(angular_velocity_vector)
+        #reward = angular_velocity
 
         
         altitude = state_variables["altitude"]
@@ -355,16 +381,20 @@ def get_reward(state):
         altitude_loss = altitude / max_altitude
         
 
+
+
         velocity_reward = 1 - velocity_loss
         altitude_reward = 1 - altitude_loss
+
+        
         #pitch_reward = -state_variables["prograde"]
 
-        reward = ((velocity_reward) + (altitude_reward)) / 2
+        reward = ((velocity_reward) + (altitude_reward) ) / 2
         #reward = velocity_reward
         #reward = (reward + 1)**10
         #reward = pitch_reward
         
-        if reward < 0.4:
+        if reward < .1:
             reward = -100
             terminal = True
         
@@ -391,14 +421,19 @@ def update_policy_net():
 # max was 500k
 frames_seen = 0
 
+
+#policy_net.load_state_dict(torch.load('saved_models/policy_net_epoch_100'))
+
 for i_episode in range(num_episodes):
     if i_episode % 25 == 0 or i_episode == 0:
         torch.save(policy_net.state_dict(), f"saved_models\\policy_net_epoch_{i_episode}")
-    conn.space_center.load('10k_mun_falling')
+    conn.space_center.load('5k mun falling')
     # this must be called AFTER the save is loaded or the num_parts will be 0
     num_ship_parts = len(vessel.parts.all)
 
-    vessel.control.sas_mode = conn.space_center.SASMode.retrograde
+
+
+    #vessel.control.sas_mode = conn.space_center.SASMode.retrograde
 
     for t in count():
         frames_seen += 1
@@ -410,8 +445,13 @@ for i_episode in range(num_episodes):
         next_state = get_state()
         reward, terminal = get_reward(next_state)
 
-
-
+        """
+        try:
+            vessel.control.sas_mode = conn.space_center.SASMode.retrograde
+        except Exception as e:
+            #print(e)
+            pass
+        """
         
         if frames_seen % 10 == 0:
             print(f"reward: {reward}   eps: {current_epsilon}, frame: {round(frames_seen/1000000, 5)}M")
