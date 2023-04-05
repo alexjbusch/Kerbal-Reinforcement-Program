@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import itertools
+import os
 
 from models import DQN
 from hyperparameters import MODEL_TO_LOAD, LR, REPLAY_MEMORY_SIZE, NUM_EPISODES
@@ -40,6 +41,8 @@ frames_seen = 0
 
 for i_episode in range(NUM_EPISODES):
     if i_episode % 25 == 0 or i_episode == 0:
+        if not os.path.exists('saved_models'):
+            os.makedirs('saved_models')
         if sys.platform == "win32":
             torch.save(game.policy_net.state_dict(), f"saved_models\\policy_net_epoch_{i_episode}")
         else:
