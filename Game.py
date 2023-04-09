@@ -13,7 +13,7 @@ from Transition import Transition
 
 class Game:
 
-    def __init__(self, conn, episode_rewards, device, num_observations, memory, policy_net, target_net, action_space,
+    def __init__(self, conn, episode_rewards, device, num_observations, memory, actor_critic, action_space,
                  optimizer, loss_function, show_result=False):
         self.conn = conn
         self.episode_rewards = episode_rewards
@@ -21,8 +21,7 @@ class Game:
         self.device = device
         self.num_observations = num_observations
         self.memory = memory
-        self.policy_net = policy_net
-        self.target_net = target_net
+        self.actor_critic_model = actor_critic
         self.action_space = action_space
         self.optimizer = optimizer
         self.loss_function = loss_function
