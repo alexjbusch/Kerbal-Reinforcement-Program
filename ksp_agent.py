@@ -74,10 +74,9 @@ def main():
             game.actor_critic_model.rewards.append(reward)
             game.ep_reward += reward
 
-            if frames_seen % 3 == 0:
-                print(f"reward: {reward}   eps: {game.current_epsilon}, frame: {round(frames_seen / 1000000, 5)}M")
-            # game.round_reward += reward
-            # reward = torch.tensor([reward], device=game.device)
+            #if frames_seen % 30 == 0:
+                #print(f"reward: {reward} )
+
             frames_seen += 1
             
             if terminal:
@@ -93,7 +92,9 @@ def main():
 
             
 
-
+        if i_episode:
+            print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
+                  i_episode, game.ep_reward, running_reward))
         game.optimize_model()
         reset()
         

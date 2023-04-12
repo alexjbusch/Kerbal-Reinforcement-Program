@@ -128,7 +128,7 @@ class Game:
         """
 
     def do_action(self, a):
-        print(f"action selected: {a}")
+        #print(f"action selected: {a}")
         match a:
             case 0:
                 self.vessel.control.throttle += THROTTLE_SENSITIVITY
@@ -190,6 +190,7 @@ class Game:
         # sum up all the values of policy_losses and value_losses
         loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
 
+        print(loss)
         # perform backprop
         loss.backward()
         self.optimizer.step()
