@@ -9,12 +9,13 @@ from torch.distributions import Categorical
 # actor based on the given policy.
 
 # 
-    
+ 
 class ActorCritic(nn.Module):
     """
     implements both actor and critic in one model, there is only one layer
     """
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, device):
+        super(ActorCritic, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
 
@@ -30,7 +31,9 @@ class ActorCritic(nn.Module):
         self.saved_actions = []
         self.rewards = []
 
-    def forward(self, state_size, action_size):
+        self.to(device)
+
+    def forward(self,x):
         """
         forward of both actor and critic
         """
@@ -38,7 +41,7 @@ class ActorCritic(nn.Module):
 
         # actor: choses action to take from state s_t
         # by returning probability of each action
-        action_prob = F.softmax(self.action_head(self.state_size), dim=-1)
+        action_prob = F.softmax(self.action_head(x), dim=-1)
 
         # critic: evaluates being in the state s_t
         state_values = self.value_head(x)

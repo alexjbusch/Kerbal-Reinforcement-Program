@@ -2,26 +2,28 @@ import math
 import random
 import matplotlib.pyplot as plt
 import torch
+from torch.distributions import Categorical
 import utils
+from numpy import finfo, float32
+
 
 from IPython import display
 
 from hyperparameters import BATCH_SIZE, GAMMA, EPS_START, EPS_END, EPS_DECAY, TAU
 from formulation import OBS, HANDLING_SENSITIVITY, THROTTLE_SENSITIVITY, MAX_ALTITUDE, MAX_VELOCITY
-from Transition import Transition
 
 
 class Game:
 
-    def __init__(self, conn, episode_rewards, device, num_observations, memory, actor_critic, action_space,
+    def __init__(self, conn, episode_rewards, device, num_observations, SaveAction, actor_critic_model, action_space,
                  optimizer, loss_function, show_result=False):
         self.conn = conn
         self.episode_rewards = episode_rewards
         self.show_result = show_result
         self.device = device
         self.num_observations = num_observations
-        self.memory = memory
-        self.actor_critic_model = actor_critic
+        self.SaveAction = SaveAction
+        self.actor_critic_model = actor_critic_model
         self.action_space = action_space
         self.optimizer = optimizer
         self.loss_function = loss_function
@@ -32,6 +34,8 @@ class Game:
         self.landed_counter = 0
         self.round_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
+
+        self.machine_epsilon = finfo(float32).eps.item()
 
     def plot_rewards(self):
         plt.figure(1)
@@ -86,7 +90,23 @@ class Game:
 
         return s
 
-    def select_action(self, s):
+    def select_action(self, state):
+        print(state)
+        probs, state_value = self.actor_critic_model(state)
+
+        # create a categorical distribution over the list of probabilities of actions
+        m = Categorical(probs)
+
+        # and sample an action using the distribution
+        action = m.sample()
+
+        # save to action buffer
+        self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
+        print(self.actor_critic_model.saved_actions)
+        # the action to take (left or right)
+        return action.item()
+
+        """
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * self.steps_done / EPS_DECAY)
         self.current_epsilon = eps_threshold
@@ -105,6 +125,7 @@ class Game:
             selected_action = torch.tensor([random.sample(self.action_space, 1)], device=self.device, dtype=torch.long)
 
         return selected_action
+        """
 
     def do_action(self, a):
         match a:
@@ -128,57 +149,46 @@ class Game:
                 pass
 
     def optimize_model(self):
-        if len(self.memory) < BATCH_SIZE:
-            return
-        transitions = self.memory.sample(BATCH_SIZE)
+        """
+        Training code. Calculates actor and critic loss and performs backprop.
+        """
+        R = 0
+        saved_actions = self.actor_critic_model.saved_actions
+        policy_losses = [] # list to save actor (policy) loss
+        value_losses = [] # list to save critic (value) loss
+        returns = [] # list to save the true values
 
-        # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
-        # detailed explanation). This converts batch-array of Transitions
-        # to Transition of batch-arrays.
-        batch = Transition(*zip(*transitions))
+        # calculate the true value using rewards returned from the environment
+        for r in self.actor_critic_model.rewards[::-1]:
+            # calculate the discounted value
+            R = r + gamma * R
+            returns.insert(0, R)
 
-        # Compute a mask of non-final states and concatenate the batch elements
-        # (a final state would've been the one after which simulation ended)
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                                batch.next_state)), device=self.device, dtype=torch.bool)
+        returns = torch.tensor(returns)
+        returns = (returns - returns.mean()) / (returns.std() + self.machine_epsilon)
 
-        non_final_next_states = torch.cat([s[None] for s in batch.next_state
-                                           if s is not None])
+        for (log_prob, value), R in zip(saved_actions, returns):
+            advantage = R - value.item()
 
-        state_batch = torch.cat(batch.state)
-        state_batch = state_batch.view(-1, self.num_observations)
+            # calculate actor (policy) loss
+            policy_losses.append(-log_prob * advantage)
 
-        assert torch.equal(batch.state[0], state_batch[0])
+            # calculate critic (value) loss using L1 smooth loss
+            value_losses.append(F.smooth_l1_loss(value, torch.tensor([R])))
 
-        action_batch = torch.cat(batch.action)
-        reward_batch = torch.cat(batch.reward)
-
-        # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
-        # columns of actions taken. These are the actions which would've been taken
-        # for each batch state according to policy_net
-
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
-
-        # Compute V(s_{t+1}) for all next states.
-        # Expected values of actions for non_final_next_states are computed based
-        # on the "older" target_net; selecting their best reward with max(1)[0].
-        # This is merged based on the mask, such that we'll have either the expected
-        # state value or 0 in case the state was final.
-        next_state_values = torch.zeros(BATCH_SIZE, device=self.device)
-        with torch.no_grad():
-            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0]
-        # Compute the expected Q values
-        expected_state_action_values = (next_state_values * GAMMA) + reward_batch
-
-        # Compute Huber loss
-        criterion = self.loss_function
-        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-        # Optimize the model
+        # reset gradients
         self.optimizer.zero_grad()
+
+        # sum up all the values of policy_losses and value_losses
+        loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
+
+        # perform backprop
         loss.backward()
-        # In-place gradient clipping
-        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
+
+        # reset rewards and action buffer
+        del self.actor_critic_model.rewards[:]
+        del self.actor_critic_model.saved_actions[:]
 
     def get_reward(self, s):
         is_terminal = False
@@ -231,11 +241,3 @@ class Game:
 
         return new_reward, is_terminal
 
-    def update_policy_net(self):
-        # Soft update of the target network's weights
-        # θ′ ← τ θ + (1 −τ )θ′
-        target_net_state_dict = self.target_net.state_dict()
-        policy_net_state_dict = self.policy_net.state_dict()
-        for key in policy_net_state_dict:
-            target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
-        self.target_net.load_state_dict(target_net_state_dict)

@@ -10,16 +10,16 @@ import os
 import numpy as np
 
 from models import ActorCritic
-from hyperparameters import MODEL_TO_LOAD, LR, REPLAY_MEMORY_SIZE, NUM_EPISODES
+from hyperparameters import MODEL_TO_LOAD, LR, NUM_EPISODES
 from formulation import OBS, ACTIONS
-from ReplayMemory import ReplayMemory
+from SaveAction import SaveAction
 from Game import Game
-from math import count
+from itertools import count
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-actor_critic_net = ActorCritic()
+actor_critic_net = ActorCritic(len(OBS),len(ACTIONS), device)
 optimizer = optim.Adam(actor_critic_net.parameters(), lr=LR, amsgrad=True)
 eps = np.finfo(np.float32).eps.item()
 
@@ -33,7 +33,7 @@ game = Game(conn=conn,
             episode_rewards=[],
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             num_observations=len(OBS),
-            memory=ReplayMemory(REPLAY_MEMORY_SIZE),
+            SaveAction=SaveAction,
             actor_critic_model = actor_critic_net,
             action_space=[action_int for action_int in range(len(ACTIONS))],
             optimizer=optimizer,
@@ -49,13 +49,52 @@ def reset():
 
 def main():
     running_reward = 10
+    
+    # used to tally up the total amount of states the model has trained on
+    frames_seen = 0
 
-    # run infinitely many episodes
+    game.conn.space_center.load('5k mun falling')
+    game.num_ship_parts = len(game.vessel.parts.all)
+
     for i_episode in range(NUM_EPISODES):
-        print("start new episode")
-        # reset environment and episode reward
-        state, _ = env.reset()
-        ep_reward = 0
+        game.conn.space_center.load('5k mun falling')
+        for frame in count():
+            state = game.get_state()
+            action = game.select_action(state)
+            game.do_action(action)
+            time.sleep(0.05)
+            next_state = game.get_state()
+            reward, terminal = game.get_reward(next_state)
+            
+            ep_reward = 0
+            if frames_seen % 10 == 0:
+                print(f"reward: {reward}   eps: {game.current_epsilon}, frame: {round(frames_seen / 1000000, 5)}M")
+            game.round_reward += reward
+            reward = torch.tensor([reward], device=game.device)
+
+            if terminal:
+                next_state = None
+
+
+            # update cumulative reward
+            running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
+
+            
+
+
+            if terminal:
+                game.episode_rewards.append(game.round_reward)
+                terminal = False
+                game.round_reward = 0.0
+                game.landed_counter = 0
+                # plot_rewards()
+                # plt.show()
+                break
+            frames_seen += 1
+
+        game.optimize_model()
+        game.plot_rewards()
+        plt.show()
 
 if __name__ == '__main__':
     main()
