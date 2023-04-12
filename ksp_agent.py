@@ -54,13 +54,13 @@ def main():
     # used to tally up the total amount of states the model has trained on
     frames_seen = 0
 
-    game.conn.space_center.load('5k mun falling')
+    game.conn.space_center.load('5k_mun_falling')
     game.num_ship_parts = len(game.vessel.parts.all)
 
     for i_episode in range(NUM_EPISODES):
         game.ep_reward = 0
 
-        game.conn.space_center.load('5k mun falling')
+        game.conn.space_center.load('5k_mun_falling')
         print("GAME LOADED")
         for frame in count():
             state = game.get_state()
@@ -72,11 +72,7 @@ def main():
 
             game.actor_critic_model.rewards.append(reward)
             game.ep_reward += reward
-
-            if frames_seen % 3 == 0:
-                print(f"reward: {reward}   eps: {game.current_epsilon}, frame: {round(frames_seen / 1000000, 5)}M")
-            # game.round_reward += reward
-            # reward = torch.tensor([reward], device=game.device)
+ 
 
             if terminal:
                 print("ROUND ENDED")
@@ -89,6 +85,9 @@ def main():
         # running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
         running_reward = 0.05 * game.ep_reward + (1 - 0.05) * running_reward
 
+        if i_episode:
+            print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
+                  i_episode, game.ep_reward, running_reward))
             
         frames_seen += 1
 
