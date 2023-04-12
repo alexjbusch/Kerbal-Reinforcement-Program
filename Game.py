@@ -32,7 +32,7 @@ class Game:
         self.steps_done = 0
         self.current_epsilon = EPS_START
         self.landed_counter = 0
-        self.round_reward = 0
+        self.ep_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
 
         self.machine_epsilon = finfo(float32).eps.item()

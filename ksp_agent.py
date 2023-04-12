@@ -41,10 +41,11 @@ game = Game(conn=conn,
             show_result=False)
 
 def reset():
-    game.episode_rewards.append(game.round_reward)
-    terminal = False
-    game.round_reward = 0.0
+    # game.episode_rewards.append(game.round_reward)
+    # terminal = False
+    game.ep_reward = 0.0
     game.landed_counter = 0
+    plt.show()
     game.plot_rewards()
 
 def main():
@@ -57,6 +58,8 @@ def main():
     game.num_ship_parts = len(game.vessel.parts.all)
 
     for i_episode in range(NUM_EPISODES):
+        game.ep_reward = 0
+
         game.conn.space_center.load('5k mun falling')
         for frame in count():
             state = game.get_state()
@@ -65,36 +68,32 @@ def main():
             time.sleep(0.05)
             next_state = game.get_state()
             reward, terminal = game.get_reward(next_state)
-            
-            ep_reward = 0
+
+            game.actor_critic_model.rewards.append(reward)
+            game.ep_reward += reward
+
             if frames_seen % 10 == 0:
                 print(f"reward: {reward}   eps: {game.current_epsilon}, frame: {round(frames_seen / 1000000, 5)}M")
-            game.round_reward += reward
-            reward = torch.tensor([reward], device=game.device)
+            # game.round_reward += reward
+            # reward = torch.tensor([reward], device=game.device)
 
             if terminal:
                 next_state = None
+                # reset()
+                # break
+        
 
-
-            # update cumulative reward
-            running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
+        # update cumulative reward
+        # running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
+        running_reward = 0.05 * game.ep_reward + (1 - 0.05) * running_reward
 
             
-
-
-            if terminal:
-                game.episode_rewards.append(game.round_reward)
-                terminal = False
-                game.round_reward = 0.0
-                game.landed_counter = 0
-                # plot_rewards()
-                # plt.show()
-                break
-            frames_seen += 1
+        frames_seen += 1
 
         game.optimize_model()
         game.plot_rewards()
-        plt.show()
+        reset()
+        
 
 if __name__ == '__main__':
     main()
