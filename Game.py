@@ -82,7 +82,7 @@ class Game:
             #                            *angular_velocity,*velocity, *rotation]).to(device)
             s = torch.FloatTensor([throttle, altitude,
                                    *velocity,
-                                   *rotation]).to(self.device)
+                                   ]).to(self.device)
 
             # print(state)
 
@@ -103,6 +103,7 @@ class Game:
         # save to action buffer
         self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
         # the action to take (left or right)
+
         return action.item()
 
         """
@@ -127,6 +128,13 @@ class Game:
         """
 
     def do_action(self, a):
+        print(f"action selected: {a}")
+        match a:
+            case 0:
+                self.vessel.control.throttle += THROTTLE_SENSITIVITY
+            case 1:
+                self.vessel.control.throttle -= THROTTLE_SENSITIVITY
+        """
         match a:
             case 0:
                 self.vessel.control.yaw += HANDLING_SENSITIVITY
@@ -146,6 +154,7 @@ class Game:
                 self.vessel.control.throttle += -THROTTLE_SENSITIVITY
             case 8:
                 pass
+        """
 
     def optimize_model(self):
         """
@@ -234,9 +243,18 @@ class Game:
             # new_reward = (reward + 1)**10
             # new_reward = pitch_reward
 
-            if new_reward < -.9:
+            if new_reward < 0:
                 new_reward = -100
                 is_terminal = True
 
         return new_reward, is_terminal
+
+    def load(self):
+        try:
+            self.conn.space_center.load('5k_mun_falling')
+        except ValueError:
+            self.conn.space_center.load('5k mun falling')
+        
+
+    
 
