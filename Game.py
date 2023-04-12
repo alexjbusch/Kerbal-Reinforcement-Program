@@ -5,6 +5,7 @@ import torch
 from torch.distributions import Categorical
 import utils
 from numpy import finfo, float32
+import torch.nn.functional as F
 
 
 from IPython import display
@@ -91,7 +92,6 @@ class Game:
         return s
 
     def select_action(self, state):
-        print(state)
         probs, state_value = self.actor_critic_model(state)
 
         # create a categorical distribution over the list of probabilities of actions
@@ -102,7 +102,6 @@ class Game:
 
         # save to action buffer
         self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
-        print(self.actor_critic_model.saved_actions)
         # the action to take (left or right)
         return action.item()
 
@@ -161,7 +160,7 @@ class Game:
         # calculate the true value using rewards returned from the environment
         for r in self.actor_critic_model.rewards[::-1]:
             # calculate the discounted value
-            R = r + gamma * R
+            R = r + GAMMA * R
             returns.insert(0, R)
 
         returns = torch.tensor(returns)
@@ -174,7 +173,7 @@ class Game:
             policy_losses.append(-log_prob * advantage)
 
             # calculate critic (value) loss using L1 smooth loss
-            value_losses.append(F.smooth_l1_loss(value, torch.tensor([R])))
+            value_losses.append(F.smooth_l1_loss(value, torch.tensor([R]).to(self.device)))
 
         # reset gradients
         self.optimizer.zero_grad()
