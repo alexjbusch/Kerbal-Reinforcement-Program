@@ -78,7 +78,8 @@ def main():
                 print(f"reward: {reward}   eps: {game.current_epsilon}, frame: {round(frames_seen / 1000000, 5)}M")
             # game.round_reward += reward
             # reward = torch.tensor([reward], device=game.device)
-
+            frames_seen += 1
+            
             if terminal:
                 print("ROUND ENDED")
                 next_state = None
@@ -91,7 +92,7 @@ def main():
         running_reward = 0.05 * game.ep_reward + (1 - 0.05) * running_reward
 
             
-        frames_seen += 1
+
 
         game.optimize_model()
         reset()

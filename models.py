@@ -23,11 +23,11 @@ class ActorCritic(nn.Module):
 
         # actor's layer
         self.actor = nn.Sequential(
-               nn.Linear(self.state_size, 128),
+               nn.Linear(self.state_size, 512),
                nn.ReLU(),
-               nn.Linear(128, 128),
+               nn.Linear(512, 512),
                nn.ReLU(),
-               nn.Linear(128, self.action_size)
+               nn.Linear(512, self.action_size)
                )
         
 
