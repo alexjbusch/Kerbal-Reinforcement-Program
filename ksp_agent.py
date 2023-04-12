@@ -45,7 +45,7 @@ def reset():
     # terminal = False
     game.ep_reward = 0.0
     game.landed_counter = 0
-    plt.show()
+    
     game.plot_rewards()
 
 def main():
@@ -61,6 +61,7 @@ def main():
         game.ep_reward = 0
 
         game.conn.space_center.load('5k mun falling')
+        print("GAME LOADED")
         for frame in count():
             state = game.get_state()
             action = game.select_action(state)
@@ -78,6 +79,7 @@ def main():
             # reward = torch.tensor([reward], device=game.device)
 
             if terminal:
+                print("ROUND ENDED")
                 next_state = None
                 terminal = False
                 break
