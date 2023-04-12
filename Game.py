@@ -244,9 +244,9 @@ class Game:
             # new_reward = (reward + 1)**10
             # new_reward = pitch_reward
 
-            if new_reward < 0:
-                new_reward = -100
-                is_terminal = True
+            # if new_reward < 0:
+            #     new_reward = -100
+            #     is_terminal = True
 
         return new_reward, is_terminal
 

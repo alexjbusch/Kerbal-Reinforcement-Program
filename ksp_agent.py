@@ -14,6 +14,7 @@ from hyperparameters import MODEL_TO_LOAD, LR, NUM_EPISODES
 from formulation import OBS, ACTIONS
 from SaveAction import SaveAction
 from Game import Game
+import time
 from itertools import count
 
 
@@ -60,10 +61,11 @@ def main():
 
     for i_episode in range(NUM_EPISODES):
         game.ep_reward = 0
+        start = time.time()
 
         game.load()
-        print("GAME LOADED")
         for frame in count():
+    
             state = game.get_state()
             action = game.select_action(state)
             game.do_action(action)
@@ -79,6 +81,11 @@ def main():
 
             frames_seen += 1
             
+            end = time.time()
+            if end-start > 45:
+                terminal = True
+                reward = -200
+                
             if terminal:
                 print("ROUND ENDED")
                 next_state = None

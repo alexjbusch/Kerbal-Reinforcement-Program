@@ -20,24 +20,24 @@ class ActorCritic(nn.Module):
         self.action_size = action_size
 
         # self.affine1 = nn.Linear(self.state_size, 128)
-
+        self.size = 32
         # actor's layer
         self.actor = nn.Sequential(
-               nn.Linear(self.state_size, 512),
+               nn.Linear(self.state_size, self.size),
                nn.ReLU(),
-               nn.Linear(512, 512),
+               nn.Linear(self.size, self.size),
                nn.ReLU(),
-               nn.Linear(512, self.action_size)
+               nn.Linear(self.size, self.action_size)
                )
         
 
         # critic's layer
         self.critic =  nn.Sequential(
-               nn.Linear(self.state_size, 128),
+               nn.Linear(self.state_size, self.size),
                nn.ReLU(),
-               nn.Linear(128, 128),
+               nn.Linear(self.size, self.size),
                nn.ReLU(),
-               nn.Linear(128, 1)
+               nn.Linear(self.size, 1)
                )
 
 
