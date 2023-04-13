@@ -42,14 +42,14 @@ game = Game(conn=conn,
             show_result=False)
 
 def reset():
-    # game.episode_rewards.append(game.round_reward)
     # terminal = False
-    game.ep_reward = 0.0
     game.landed_counter = 0
-    
+    game.episode_rewards.append(game.current_round_reward)
+    game.current_round_reward = 0
     game.plot_rewards()
 
 def main():
+    plt.ion()
     running_reward = 10
     
     # used to tally up the total amount of states the model has trained on
@@ -60,7 +60,6 @@ def main():
     game.num_ship_parts = len(game.vessel.parts.all)
 
     for i_episode in range(NUM_EPISODES):
-        game.ep_reward = 0
         start = time.time()
 
         game.load()
@@ -74,7 +73,8 @@ def main():
             reward, terminal = game.get_reward(next_state)
 
             game.actor_critic_model.rewards.append(reward)
-            game.ep_reward += reward
+            game.current_round_reward += reward
+            
 
             #if frames_seen % 30 == 0:
                 #print(f"reward: {reward} )
@@ -95,16 +95,19 @@ def main():
 
         # update cumulative reward
         # running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
-        running_reward = 0.05 * game.ep_reward + (1 - 0.05) * running_reward
+        running_reward = 0.05 * game.current_round_reward + (1 - 0.05) * running_reward
 
             
 
         if i_episode:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
-                  i_episode, game.ep_reward, running_reward))
+                  i_episode, game.current_round_reward, running_reward))
         game.optimize_model()
         reset()
+
         
 
 if __name__ == '__main__':
     main()
+plt.ioff()
+plt.show()

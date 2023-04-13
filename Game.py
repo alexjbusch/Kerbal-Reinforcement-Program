@@ -1,6 +1,9 @@
 import math
 import random
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Qt5Agg')
+
 import torch
 from torch.distributions import Categorical
 import utils
@@ -19,7 +22,7 @@ class Game:
     def __init__(self, conn, episode_rewards, device, num_observations, SaveAction, actor_critic_model, action_space,
                  optimizer, loss_function, show_result=False):
         self.conn = conn
-        self.episode_rewards = episode_rewards
+        self.episode_rewards = episode_rewards        
         self.show_result = show_result
         self.device = device
         self.num_observations = num_observations
@@ -33,19 +36,20 @@ class Game:
         self.steps_done = 0
         self.current_epsilon = EPS_START
         self.landed_counter = 0
-        self.ep_reward = 0
+        self.current_round_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
 
         self.machine_epsilon = finfo(float32).eps.item()
 
     def plot_rewards(self):
         plt.figure(1)
+        
         rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
-        if self.show_result:
-            plt.title('Result')
-        else:
-            plt.clf()
-            plt.title('Training...')
+
+
+        plt.clf()
+        plt.title('Training...')
+
         plt.xlabel('Episode')
         plt.ylabel('Reward')
         plt.plot(rewards_t.numpy())
@@ -55,8 +59,8 @@ class Game:
             means = torch.cat((torch.zeros(9), means))
             plt.plot(means.numpy())
 
-        plt.pause(0.5)
-        display.display(plt.gcf())
+        plt.pause(0.001)  # pause a bit so that plots are updated
+    
 
     def get_state(self):
         if self.vessel:
@@ -243,10 +247,9 @@ class Game:
             # new_reward = velocity_reward
             # new_reward = (reward + 1)**10
             # new_reward = pitch_reward
-
-            # if new_reward < 0:
-            #     new_reward = -100
-            #     is_terminal = True
+            if new_reward < 0:
+                new_reward = -100
+                is_terminal = True
 
         return new_reward, is_terminal
 
