@@ -194,7 +194,7 @@ class Game:
         # sum up all the values of policy_losses and value_losses
         loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
 
-        print(loss)
+        print("loss", loss)
         # perform backprop
         loss.backward()
         self.optimizer.step()
