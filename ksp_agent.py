@@ -16,6 +16,8 @@ from SaveAction import SaveAction
 from Game import Game
 import time
 from itertools import count
+from torch.utils.tensorboard import SummaryWriter
+# writer = SummaryWriter()
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,7 +31,7 @@ if MODEL_TO_LOAD not in [None, ""]:
 
 conn = krpc.connect(name='ksp_agent')
 vessel = conn.space_center.active_vessel
-
+# TODO: once you get action vector add gaussian noise and reduce variance time
 game = Game(conn=conn,
             episode_rewards=[],
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -85,7 +87,7 @@ def main():
             if end-start > 45:
                 terminal = True
                 reward = -200
-                
+
             if terminal:
                 print("ROUND ENDED")
                 next_state = None
@@ -102,9 +104,16 @@ def main():
         if i_episode:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                   i_episode, game.ep_reward, running_reward))
-        game.optimize_model()
+        writer.add_scalar("Last Reward", game.ep_reward, i_episode)
+        loss = game.optimize_model()
+        writer.add_scalar("Loss", loss, i_episode)
         reset()
+    
+    writer.close()
         
 
 if __name__ == '__main__':
+    # Initialize the SummaryWriter for TensorBoard
+    # Its output will be written to ./runs/
+    writer = SummaryWriter(log_dir='./runs/256_model')
     main()
