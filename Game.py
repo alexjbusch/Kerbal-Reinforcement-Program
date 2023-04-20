@@ -81,7 +81,7 @@ class Game:
             # state = torch.FloatTensor([angle_of_attack,sideslip_angle,altitude,fuel,
             #                            *angular_velocity,*velocity, *rotation]).to(device)
             s = torch.FloatTensor([throttle, altitude,
-                                   *velocity,
+                                   *velocity,*rotation
                                    ]).to(self.device)
 
             # print(state)
@@ -93,12 +93,21 @@ class Game:
 
     def select_action(self, state):
         probs, state_value = self.actor_critic_model(state)
+        # print("probs before: ", probs.weight)
+        # noise = torch.zeros(9, dtype=torch.float64)
+        # noise = noise + (0.1**0.5) * torch.randn(9)
+        # probs = probs + noise
+        print("probs after: ", probs)
+        
 
         # create a categorical distribution over the list of probabilities of actions
         m = Categorical(probs)
+        
 
         # and sample an action using the distribution
+        print("m", m)
         action = m.sample()
+        print("action", action)
 
         # save to action buffer
         self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
@@ -129,12 +138,12 @@ class Game:
 
     def do_action(self, a):
         #print(f"action selected: {a}")
-        match a:
-            case 0:
-                self.vessel.control.throttle += THROTTLE_SENSITIVITY
-            case 1:
-                self.vessel.control.throttle -= THROTTLE_SENSITIVITY
-        """
+        # match a:
+        #     case 0:
+        #         self.vessel.control.throttle += THROTTLE_SENSITIVITY
+        #     case 1:
+        #         self.vessel.control.throttle -= THROTTLE_SENSITIVITY
+        
         match a:
             case 0:
                 self.vessel.control.yaw += HANDLING_SENSITIVITY
@@ -154,7 +163,7 @@ class Game:
                 self.vessel.control.throttle += -THROTTLE_SENSITIVITY
             case 8:
                 pass
-        """
+        
 
     def optimize_model(self):
         """
@@ -198,6 +207,8 @@ class Game:
         # reset rewards and action buffer
         del self.actor_critic_model.rewards[:]
         del self.actor_critic_model.saved_actions[:]
+
+        return loss
 
     def get_reward(self, s):
         is_terminal = False
@@ -252,9 +263,9 @@ class Game:
 
     def load(self):
         try:
-            self.conn.space_center.load('5k_mun_falling')
+            self.conn.space_center.load('10k_mun_falling')
         except ValueError:
-            self.conn.space_center.load('5k mun falling')
+            self.conn.space_center.load('10 k mun falling')
         
 
     

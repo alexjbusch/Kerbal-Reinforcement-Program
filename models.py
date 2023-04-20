@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+import torch
 
 
 # In the Actor-Critic method, the policy is referred to as the actor that 
@@ -10,6 +11,9 @@ from torch.distributions import Categorical
 
 # 
  
+def add_noise (x):
+    return  x + (0.1**0.5) * torch.randn_like (x)
+
 class ActorCritic(nn.Module):
     """
     implements both actor and critic in one model, there is only one layer
@@ -20,7 +24,9 @@ class ActorCritic(nn.Module):
         self.action_size = action_size
 
         # self.affine1 = nn.Linear(self.state_size, 128)
-        self.size = 32
+        self.size = 256
+        self.lin1 = torch.nn.Linear (in_features=self.action_size, out_features=self.action_size)
+        
         # actor's layer
         self.actor = nn.Sequential(
                nn.Linear(self.state_size, self.size),
@@ -54,7 +60,9 @@ class ActorCritic(nn.Module):
 
         # actor: choses action to take from state s_t
         # by returning probability of each action
-        actor = F.softmax(self.actor(x), dim=-1)
+        actor_out = self.actor(x)
+        actor_out_with_noise = torch.nn.functional.linear (actor_out, add_noise (self.lin1.weight), self.lin1.bias)
+        actor = F.softmax( actor_out_with_noise, dim=-1)
 
         # critic: evaluates being in the state s_t
         critic = self.critic(x)

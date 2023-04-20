@@ -49,7 +49,7 @@ def reset():
     game.ep_reward = 0.0
     game.landed_counter = 0
     
-    game.plot_rewards()
+    # game.plot_rewards()
 
 def main():
     running_reward = 10
@@ -115,5 +115,5 @@ def main():
 if __name__ == '__main__':
     # Initialize the SummaryWriter for TensorBoard
     # Its output will be written to ./runs/
-    writer = SummaryWriter(log_dir='./runs/256_model')
+    writer = SummaryWriter(log_dir='./runs/model2', comment="LR_1e-6, batchSize32, gaussian noise")
     main()
