@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Kerbal-Reinforcement-Program.iml" filepath="$PROJECT_DIR$/.idea/Kerbal-Reinforcement-Program.iml" />
+      <module fileurl="file://$USER_HOME$/sorrentum/.idea/sorrentum.iml" filepath="$USER_HOME$/sorrentum/.idea/sorrentum.iml" />
     </modules>
   </component>
 </project>
