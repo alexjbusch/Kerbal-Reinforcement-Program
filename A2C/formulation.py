@@ -3,6 +3,17 @@ THROTTLE_SENSITIVITY = 0.3
 MAX_ALTITUDE = 600
 MAX_VELOCITY = 130
 
+
+# OBS = ["throttle",
+#        "altitude",
+#        "velocity_x",
+#        "velocity_y",
+#        "velocity_z",]
+# ACTIONS = [
+#            "throttle_up",
+#            "throttle_down",]
+
+
 OBS = ["throttle",
        "altitude",
        "velocity_x",
@@ -21,6 +32,8 @@ ACTIONS = ["yaw_up",
            "throttle_up",
            "throttle_down",
            "do_nothing"]
+
+
 
 # observations = ["altitude",
 #                 "fuel",

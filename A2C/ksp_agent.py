@@ -16,6 +16,8 @@ from SaveAction import SaveAction
 from Game import Game
 import time
 from itertools import count
+from torch.utils.tensorboard import SummaryWriter
+# writer = SummaryWriter()
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,7 +31,7 @@ if MODEL_TO_LOAD not in [None, ""]:
 
 conn = krpc.connect(name='ksp_agent')
 vessel = conn.space_center.active_vessel
-
+# TODO: once you get action vector add gaussian noise and reduce variance time
 game = Game(conn=conn,
             episode_rewards=[],
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -42,14 +44,14 @@ game = Game(conn=conn,
             show_result=False)
 
 def reset():
+    # game.episode_rewards.append(game.round_reward)
     # terminal = False
+    game.ep_reward = 0.0
     game.landed_counter = 0
-    game.episode_rewards.append(game.current_round_reward)
-    game.current_round_reward = 0
-    game.plot_rewards()
+    
+    # game.plot_rewards()
 
 def main():
-    plt.ion()
     running_reward = 10
     
     # used to tally up the total amount of states the model has trained on
@@ -60,6 +62,7 @@ def main():
     game.num_ship_parts = len(game.vessel.parts.all)
 
     for i_episode in range(NUM_EPISODES):
+        game.ep_reward = 0
         start = time.time()
 
         game.load()
@@ -73,8 +76,7 @@ def main():
             reward, terminal = game.get_reward(next_state)
 
             game.actor_critic_model.rewards.append(reward)
-            game.current_round_reward += reward
-            
+            game.ep_reward += reward
 
             #if frames_seen % 30 == 0:
                 #print(f"reward: {reward} )
@@ -82,10 +84,10 @@ def main():
             frames_seen += 1
             
             end = time.time()
-            if end-start > 45:
+            if end-start > 50:
                 terminal = True
                 reward = -200
-                
+
             if terminal:
                 print("ROUND ENDED")
                 next_state = None
@@ -95,19 +97,23 @@ def main():
 
         # update cumulative reward
         # running_reward = 0.05 * game.round_reward + (1 - 0.05) * running_reward
-        running_reward = 0.05 * game.current_round_reward + (1 - 0.05) * running_reward
+        running_reward = 0.05 * game.ep_reward + (1 - 0.05) * running_reward
 
             
 
         if i_episode:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
-                  i_episode, game.current_round_reward, running_reward))
-        game.optimize_model()
+                  i_episode, game.ep_reward, running_reward))
+        writer.add_scalar("Last Reward", i_episode, game.ep_reward)
+        loss = game.optimize_model()
+        writer.add_scalar("Loss", i_episode, loss)
         reset()
-
+    
+    writer.close()
         
 
 if __name__ == '__main__':
+    # Initialize the SummaryWriter for TensorBoard
+    # Its output will be written to ./runs/
+    writer = SummaryWriter(log_dir='./runs/model3', comment="LR_1e-6, batchSize32, gaussian noise, with acceleration")
     main()
-plt.ioff()
-plt.show()

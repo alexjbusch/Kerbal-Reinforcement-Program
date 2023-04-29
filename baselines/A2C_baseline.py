@@ -6,7 +6,7 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
 
-ENV_NAME = ('KerbalLander-v0')
+ENV_NAME = 'KerbalLander-v0'
 ksp_env = gym.make(ENV_NAME)
 check_env(ksp_env, warn=True)
 
@@ -23,7 +23,5 @@ for step in range(n_steps):
     print("obs=", obs, "reward=", reward, "done=", done)
     ksp_vec_env.render()
     if done:
-        # Note that the VecEnv resets automatically
-        # when a done signal is encountered
         print("Goal reached!", "reward=", reward)
         break

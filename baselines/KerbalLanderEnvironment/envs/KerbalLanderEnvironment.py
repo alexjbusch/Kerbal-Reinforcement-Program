@@ -380,7 +380,7 @@ if __name__ == '__main__':
 
     import time
 
-    lander = KerbalLanderEnvironment(saveName='5k_mun_falling')
+    lander = KerbalLanderEnvironment(saveName='10k_mun_falling')
 
     # print(lander.step([0, 0, 1]))
 
