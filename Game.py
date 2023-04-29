@@ -30,12 +30,14 @@ class Game:
         self.loss_function = loss_function
 
         self.vessel = conn.space_center.active_vessel
+        self.speedMode = self.vessel.control.speed_mode
         self.steps_done = 0
         self.current_epsilon = EPS_START
         self.landed_counter = 0
         self.ep_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
-
+        self.prev_vel = 0
+        self.prev_alt = 0
         self.machine_epsilon = finfo(float32).eps.item()
 
     def plot_rewards(self):
@@ -93,21 +95,13 @@ class Game:
 
     def select_action(self, state):
         probs, state_value = self.actor_critic_model(state)
-        # print("probs before: ", probs.weight)
-        # noise = torch.zeros(9, dtype=torch.float64)
-        # noise = noise + (0.1**0.5) * torch.randn(9)
-        # probs = probs + noise
-        print("probs after: ", probs)
-        
 
         # create a categorical distribution over the list of probabilities of actions
         m = Categorical(probs)
         
 
         # and sample an action using the distribution
-        print("m", m)
         action = m.sample()
-        print("action", action)
 
         # save to action buffer
         self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
@@ -221,7 +215,7 @@ class Game:
             self.landed_counter += 1
             if self.landed_counter > 5:
                 is_terminal = True
-                new_reward = 1000
+                new_reward = 10000
         else:
             self.landed_counter = 0
 
@@ -248,16 +242,37 @@ class Game:
             velocity_reward = 1 - velocity_loss
             altitude_reward = 1 - altitude_loss
 
-            # pitch_reward = -state_variables["prograde"]
 
-            new_reward = (velocity_reward + altitude_reward) / 2
-            # new_reward = velocity_reward
-            # new_reward = (reward + 1)**10
-            # new_reward = pitch_reward
+            acceleration = velocity - self.prev_vel
+            self.prev_vel = velocity
+            vessel_speed_relative_to_mun = self.vessel.orbit.speed
+            
+            # new_reward = 10*(1/vessel_speed_relative_to_mun)**0.5 + 10*(1/altitude)**0.5
 
-            # if new_reward < 0:
-            #     new_reward = -100
-            #     is_terminal = True
+            speed_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
+
+            delta_altitude = self.prev_alt - altitude
+            self.prev_alt = altitude
+            distance_reward = delta_altitude * (1/altitude)**0.5
+            print("altitude change", delta_altitude)
+            print("distance_reward",distance_reward)
+            print("speed_reward",speed_reward)
+
+            new_reward = speed_reward + distance_reward
+            if altitude > 6000:
+                is_terminal = True
+                new_reward = -100
+            
+            if vessel_speed_relative_to_mun < 70 and altitude < 3000 and acceleration > 0:
+                new_reward -= 10
+
+            
+            print("")
+            
+
+           
+         
+                
 
         return new_reward, is_terminal
 

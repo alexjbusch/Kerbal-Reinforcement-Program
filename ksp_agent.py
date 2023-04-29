@@ -84,7 +84,7 @@ def main():
             frames_seen += 1
             
             end = time.time()
-            if end-start > 45:
+            if end-start > 50:
                 terminal = True
                 reward = -200
 
@@ -104,9 +104,9 @@ def main():
         if i_episode:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                   i_episode, game.ep_reward, running_reward))
-        writer.add_scalar("Last Reward", game.ep_reward, i_episode)
+        writer.add_scalar("Last Reward", i_episode, game.ep_reward)
         loss = game.optimize_model()
-        writer.add_scalar("Loss", loss, i_episode)
+        writer.add_scalar("Loss", i_episode, loss)
         reset()
     
     writer.close()
@@ -115,5 +115,5 @@ def main():
 if __name__ == '__main__':
     # Initialize the SummaryWriter for TensorBoard
     # Its output will be written to ./runs/
-    writer = SummaryWriter(log_dir='./runs/model2', comment="LR_1e-6, batchSize32, gaussian noise")
+    writer = SummaryWriter(log_dir='./runs/model3', comment="LR_1e-6, batchSize32, gaussian noise, with acceleration")
     main()
