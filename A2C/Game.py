@@ -1,9 +1,6 @@
 import math
 import random
 import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Qt5Agg')
-
 import torch
 from torch.distributions import Categorical
 import utils
@@ -22,7 +19,7 @@ class Game:
     def __init__(self, conn, episode_rewards, device, num_observations, SaveAction, actor_critic_model, action_space,
                  optimizer, loss_function, show_result=False):
         self.conn = conn
-        self.episode_rewards = episode_rewards        
+        self.episode_rewards = episode_rewards
         self.show_result = show_result
         self.device = device
         self.num_observations = num_observations
@@ -33,23 +30,24 @@ class Game:
         self.loss_function = loss_function
 
         self.vessel = conn.space_center.active_vessel
+        self.speedMode = self.vessel.control.speed_mode
         self.steps_done = 0
         self.current_epsilon = EPS_START
         self.landed_counter = 0
-        self.current_round_reward = 0
+        self.ep_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
-
+        self.prev_vel = 0
+        self.prev_alt = 0
         self.machine_epsilon = finfo(float32).eps.item()
 
     def plot_rewards(self):
         plt.figure(1)
-        
         rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
-
-
-        plt.clf()
-        plt.title('Training...')
-
+        if self.show_result:
+            plt.title('Result')
+        else:
+            plt.clf()
+            plt.title('Training...')
         plt.xlabel('Episode')
         plt.ylabel('Reward')
         plt.plot(rewards_t.numpy())
@@ -59,8 +57,8 @@ class Game:
             means = torch.cat((torch.zeros(9), means))
             plt.plot(means.numpy())
 
-        plt.pause(0.001)  # pause a bit so that plots are updated
-    
+        plt.pause(0.5)
+        display.display(plt.gcf())
 
     def get_state(self):
         if self.vessel:
@@ -85,7 +83,7 @@ class Game:
             # state = torch.FloatTensor([angle_of_attack,sideslip_angle,altitude,fuel,
             #                            *angular_velocity,*velocity, *rotation]).to(device)
             s = torch.FloatTensor([throttle, altitude,
-                                   *velocity,
+                                   *velocity,*rotation
                                    ]).to(self.device)
 
             # print(state)
@@ -100,6 +98,7 @@ class Game:
 
         # create a categorical distribution over the list of probabilities of actions
         m = Categorical(probs)
+        
 
         # and sample an action using the distribution
         action = m.sample()
@@ -133,12 +132,12 @@ class Game:
 
     def do_action(self, a):
         #print(f"action selected: {a}")
-        match a:
-            case 0:
-                self.vessel.control.throttle += THROTTLE_SENSITIVITY
-            case 1:
-                self.vessel.control.throttle -= THROTTLE_SENSITIVITY
-        """
+        # match a:
+        #     case 0:
+        #         self.vessel.control.throttle += THROTTLE_SENSITIVITY
+        #     case 1:
+        #         self.vessel.control.throttle -= THROTTLE_SENSITIVITY
+        
         match a:
             case 0:
                 self.vessel.control.yaw += HANDLING_SENSITIVITY
@@ -158,7 +157,7 @@ class Game:
                 self.vessel.control.throttle += -THROTTLE_SENSITIVITY
             case 8:
                 pass
-        """
+        
 
     def optimize_model(self):
         """
@@ -203,6 +202,8 @@ class Game:
         del self.actor_critic_model.rewards[:]
         del self.actor_critic_model.saved_actions[:]
 
+        return loss
+
     def get_reward(self, s):
         is_terminal = False
 
@@ -214,7 +215,7 @@ class Game:
             self.landed_counter += 1
             if self.landed_counter > 5:
                 is_terminal = True
-                new_reward = 1000
+                new_reward = 10000
         else:
             self.landed_counter = 0
 
@@ -241,23 +242,45 @@ class Game:
             velocity_reward = 1 - velocity_loss
             altitude_reward = 1 - altitude_loss
 
-            # pitch_reward = -state_variables["prograde"]
 
-            new_reward = (velocity_reward + altitude_reward) / 2
-            # new_reward = velocity_reward
-            # new_reward = (reward + 1)**10
-            # new_reward = pitch_reward
-            if new_reward < 0:
-                new_reward = -100
+            acceleration = velocity - self.prev_vel
+            self.prev_vel = velocity
+            vessel_speed_relative_to_mun = self.vessel.orbit.speed
+            
+            # new_reward = 10*(1/vessel_speed_relative_to_mun)**0.5 + 10*(1/altitude)**0.5
+
+            speed_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
+
+            delta_altitude = self.prev_alt - altitude
+            self.prev_alt = altitude
+            distance_reward = delta_altitude * (1/altitude)**0.5
+            print("altitude change", delta_altitude)
+            print("distance_reward",distance_reward)
+            print("speed_reward",speed_reward)
+
+            new_reward = speed_reward + distance_reward
+            if altitude > 6000:
                 is_terminal = True
+                new_reward = -100
+            
+            if vessel_speed_relative_to_mun < 70 and altitude < 3000 and acceleration > 0:
+                new_reward -= 10
+
+            
+            print("")
+            
+
+           
+         
+                
 
         return new_reward, is_terminal
 
     def load(self):
         try:
-            self.conn.space_center.load('5k_mun_falling')
+            self.conn.space_center.load('10k_mun_falling')
         except ValueError:
-            self.conn.space_center.load('5k mun falling')
+            self.conn.space_center.load('10 k mun falling')
         
 
     
