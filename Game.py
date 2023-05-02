@@ -29,17 +29,19 @@ class Game:
         self.optimizer = optimizer
         self.loss_function = loss_function
 
+        self.first_eps = True
         self.vessel = conn.space_center.active_vessel
         self.speedMode = self.vessel.control.speed_mode
         self.steps_done = 0
-        self.prev_delta_alt = 0
+        self.prev_delta_alt = 5505
         self.current_epsilon = EPS_START
         self.landed_counter = 0
         self.ep_reward = 0
         self.num_ship_parts = len(self.vessel.parts.all)
         self.prev_vel = 0
-        self.prev_alt = 0
+        self.prev_alt = None
         self.machine_epsilon = finfo(float32).eps.item()
+
 
     def plot_rewards(self):
         plt.figure(1)
@@ -99,6 +101,7 @@ class Game:
 
         # create a categorical distribution over the list of probabilities of actions
         m = Categorical(probs)
+        # print(probs)
         
 
         # and sample an action using the distribution
@@ -107,7 +110,7 @@ class Game:
         # save to action buffer
         self.actor_critic_model.saved_actions.append(self.SaveAction(m.log_prob(action), state_value))
         # the action to take (left or right)
-        print(action.item())
+        # print(action.item())
 
         return action.item()
 
@@ -225,7 +228,7 @@ class Game:
 
         if parts_destroyed > 0:
             is_terminal = True
-            new_reward = -10
+            new_reward = -5000
 
         if not is_terminal:
             state_variables = {key: value.item() for key, value in zip(OBS, s)}
@@ -234,8 +237,6 @@ class Game:
             velocity = utils.list_magnitude(velocity_vector)
 
             altitude = state_variables["altitude"]
-
-
             vessel_speed_relative_to_mun = self.vessel.orbit.speed
             velocity = vessel_speed_relative_to_mun
             acceleration = velocity - self.prev_vel
@@ -244,14 +245,18 @@ class Game:
 
             velocity_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
 
-            delta_altitude = (self.prev_alt - altitude)
-            self.prev_delta_alt = delta_altitude
-            self.prev_alt = altitude
-
-            if delta_altitude < 0:
-                distance_reward = delta_altitude
+            if self.prev_alt == None:
+                self.prev_alt = altitude
+                distance_reward = (1/altitude)**0.5
             else:
-                distance_reward = delta_altitude * (1/altitude)**0.5
+                delta_altitude = (self.prev_alt - altitude)
+                self.prev_delta_alt = delta_altitude
+                self.prev_alt = altitude
+
+                if delta_altitude < 0:
+                    distance_reward = delta_altitude
+                else:
+                    distance_reward = delta_altitude * (1/altitude)**0.5
 
 
             new_reward = velocity_reward + distance_reward
@@ -262,19 +267,17 @@ class Game:
             
             if altitude > 2000:
                 new_reward = velocity_reward + 40 * distance_reward
-
             else:
-
                 new_reward = 20*velocity_reward + distance_reward
-  
                 
-        
-            
+            # print("alt: ", altitude)
+         
             # print("altitude change", delta_altitude)
-            # print("distance_reward",distance_reward)
-            # print("velocity_reward",velocity_reward)
-            # print("new_reward : ", new_reward)
-            # print("")
+        #     print("distance_reward",distance_reward)
+        #     print("velocity_reward",velocity_reward)
+        #     print('reward1', new_reward)
+        # print("new_reward2 : ", new_reward)
+        # print("")
             
 
            

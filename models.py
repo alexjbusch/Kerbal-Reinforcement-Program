@@ -12,7 +12,8 @@ import torch
 # 
  
 def add_noise (x):
-    return  x + (0.1**0.5) * torch.randn_like (x)
+    
+    return  x + (0.05**0.5) * torch.randn_like (x)
 
 class ActorCritic(nn.Module):
     """

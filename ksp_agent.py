@@ -47,6 +47,7 @@ def reset():
     # game.episode_rewards.append(game.round_reward)
     # terminal = False
     game.ep_reward = 0.0
+    game.prev_alt = None
     game.landed_counter = 0
     
     # game.plot_rewards()
@@ -77,6 +78,9 @@ def main(writer):
 
             game.actor_critic_model.rewards.append(reward)
             game.ep_reward += reward
+            # print("---")
+            # print("game.reward", game.ep_reward)
+
 
             #if frames_seen % 30 == 0:
                 #print(f"reward: {reward} )
@@ -86,7 +90,7 @@ def main(writer):
             end = time.time()
             if end-start > 70:
                 terminal = True
-                reward = -200
+                reward = -5000
 
             if terminal:
                 print("ROUND ENDED")
@@ -104,6 +108,9 @@ def main(writer):
         if i_episode:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                   i_episode, game.ep_reward, running_reward))
+            
+        if i_episode % 25 == 0:
+            torch.save(game.actor_critic_model.state_dict(), "/Users/riyakumari/Documents/472/Kerbal-Reinforcement-Program/saved_models/model")
         writer.add_scalar("Last Reward", game.ep_reward, i_episode)
         loss = game.optimize_model()
         writer.add_scalar("Loss", loss, i_episode)
@@ -115,5 +122,5 @@ def main(writer):
 if __name__ == '__main__':
     # Initialize the SummaryWriter for TensorBoard
     # Its output will be written to ./runs/
-    writer = SummaryWriter(log_dir='./runs/model6', comment="LR_1e-6, batchSize32, gaussian noise, reduced action space, changed rewards, added leaky relu")
+    writer = SummaryWriter(log_dir='./runs/model7', comment="LR_1e-6, batchSize32, gaussian noise, reduced action space, changed and fixed rewards, added leaky relu")
     main(writer)
