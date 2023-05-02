@@ -30,9 +30,9 @@ class ActorCritic(nn.Module):
         # actor's layer
         self.actor = nn.Sequential(
                nn.Linear(self.state_size, self.size),
-               nn.ReLU(),
+               nn.LeakyReLU(0.1),
                nn.Linear(self.size, self.size),
-               nn.ReLU(),
+               nn.LeakyReLU(0.1),
                nn.Linear(self.size, self.action_size)
                )
         
@@ -40,9 +40,9 @@ class ActorCritic(nn.Module):
         # critic's layer
         self.critic =  nn.Sequential(
                nn.Linear(self.state_size, self.size),
-               nn.ReLU(),
+               nn.LeakyReLU(0.1),
                nn.Linear(self.size, self.size),
-               nn.ReLU(),
+               nn.LeakyReLU(0.1),
                nn.Linear(self.size, 1)
                )
 

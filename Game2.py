@@ -32,7 +32,6 @@ class Game:
         self.vessel = conn.space_center.active_vessel
         self.speedMode = self.vessel.control.speed_mode
         self.steps_done = 0
-        self.prev_delta_alt = 0
         self.current_epsilon = EPS_START
         self.landed_counter = 0
         self.ep_reward = 0
@@ -225,7 +224,7 @@ class Game:
 
         if parts_destroyed > 0:
             is_terminal = True
-            new_reward = -10
+            new_reward = -100
 
         if not is_terminal:
             state_variables = {key: value.item() for key, value in zip(OBS, s)}
@@ -245,7 +244,6 @@ class Game:
             velocity_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
 
             delta_altitude = (self.prev_alt - altitude)
-            self.prev_delta_alt = delta_altitude
             self.prev_alt = altitude
 
             if delta_altitude < 0:
@@ -260,21 +258,28 @@ class Game:
                 is_terminal = True
                 new_reward = -200
             
-            if altitude > 2000:
+            if altitude > 3000:
                 new_reward = velocity_reward + 40 * distance_reward
-
             else:
+                if vessel_speed_relative_to_mun > 150:
+                    velocity_reward = -4+40*velocity_reward
+                    new_reward = velocity_reward + distance_reward
 
-                new_reward = 20*velocity_reward + distance_reward
-  
-                
-        
+                if vessel_speed_relative_to_mun > 100:
+                    velocity_reward = -2+40*velocity_reward
+                    new_reward = velocity_reward+ distance_reward
+
+                if vessel_speed_relative_to_mun > 50:
+                    velocity_reward = 40*velocity_reward
+                    new_reward = velocity_reward + distance_reward
             
-            # print("altitude change", delta_altitude)
-            # print("distance_reward",distance_reward)
-            # print("velocity_reward",velocity_reward)
-            # print("new_reward : ", new_reward)
-            # print("")
+
+            
+            print("altitude change", delta_altitude)
+            print("distance_reward",distance_reward)
+            print("velocity_reward",velocity_reward)
+            print("new_reward : ", new_reward)
+            print("")
             
 
            

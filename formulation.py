@@ -14,6 +14,25 @@ MAX_VELOCITY = 130
 #            "throttle_down",]
 
 
+# OBS = ["throttle",
+#        "altitude",
+#        "velocity_x",
+#        "velocity_y",
+#        "velocity_z",
+#        "rotation_x",
+#        "rotation_y",
+#        "rotation_z",
+#        "rotation_w"]
+# ACTIONS = ["yaw_up",
+#            "yaw_down",
+#            "pitch_up",
+#            "pitch_down",
+#            "roll_up",
+#            "roll_down",
+#            "throttle_up",
+#            "throttle_down",
+#            "do_nothing"]
+
 OBS = ["throttle",
        "altitude",
        "velocity_x",
@@ -23,13 +42,7 @@ OBS = ["throttle",
        "rotation_y",
        "rotation_z",
        "rotation_w"]
-ACTIONS = ["yaw_up",
-           "yaw_down",
-           "pitch_up",
-           "pitch_down",
-           "roll_up",
-           "roll_down",
-           "throttle_up",
+ACTIONS = ["throttle_up",
            "throttle_down",
            "do_nothing"]
 
