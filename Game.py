@@ -398,9 +398,9 @@ class Game:
         return new_reward, is_terminal
     def load(self):
         try:
-            self.conn.space_center.load('10k_mun_falling')
+            self.conn.space_center.load('5k_mun_falling')
         except ValueError:
-            self.conn.space_center.load('10 k mun falling')
+            self.conn.space_center.load('5k mun falling')
         
 
     
