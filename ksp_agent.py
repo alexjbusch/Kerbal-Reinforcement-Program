@@ -26,8 +26,10 @@ actor_critic_net = ActorCritic(len(OBS),len(ACTIONS), device)
 optimizer = optim.Adam(actor_critic_net.parameters(), lr=LR, amsgrad=True)
 eps = np.finfo(np.float32).eps.item()
 
-if MODEL_TO_LOAD not in [None, ""]:
-    actor_critic_net.load_state_dict(torch.load("./saved_models/policy_net_epoch_75"))
+# if MODEL_TO_LOAD not in [None, ""]:
+#     actor_critic_net.load_state_dict(torch.load("./saved_models/policy_net_epoch_75"))
+
+actor_critic_net.load_state_dict(torch.load("./saved_models/model_attempt2_cont8"))
 
 conn = krpc.connect(name='ksp_agent')
 vessel = conn.space_center.active_vessel
@@ -88,7 +90,7 @@ def main(writer):
             frames_seen += 1
             
             end = time.time()
-            if end-start > 70:
+            if end-start > 150:
                 terminal = True
                 reward = -5000
 
@@ -110,7 +112,7 @@ def main(writer):
                   i_episode, game.ep_reward, running_reward))
             
         if i_episode % 25 == 0:
-            torch.save(game.actor_critic_model.state_dict(), "/Users/riyakumari/Documents/472/Kerbal-Reinforcement-Program/saved_models/model")
+            torch.save(game.actor_critic_model.state_dict(), "/Users/riyakumari/Documents/472/Kerbal-Reinforcement-Program/saved_models/model_attempt2_cont9")
         writer.add_scalar("Last Reward", game.ep_reward, i_episode)
         loss = game.optimize_model()
         writer.add_scalar("Loss", loss, i_episode)
@@ -122,5 +124,5 @@ def main(writer):
 if __name__ == '__main__':
     # Initialize the SummaryWriter for TensorBoard
     # Its output will be written to ./runs/
-    writer = SummaryWriter(log_dir='./runs/model7', comment="LR_1e-6, batchSize32, gaussian noise, reduced action space, changed and fixed rewards, added leaky relu")
+    writer = SummaryWriter(log_dir='./runs/model_attempt2_cont9', comment="LR_1e-6, batchSize32, gaussian noise, reduced action space, changed and fixed rewards, added leaky relu")
     main(writer)

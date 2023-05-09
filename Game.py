@@ -263,7 +263,7 @@ class Game:
 
             if altitude > 6000:
                 is_terminal = True
-                new_reward = -200
+                new_reward = -20000
             
             if altitude > 2000:
                 new_reward = velocity_reward + 40 * distance_reward
