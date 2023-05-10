@@ -21,6 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 actor_critic_net = ActorCritic(len(OBS),len(ACTIONS), device)
@@ -88,7 +89,7 @@ def main():
             end = time.time()
             if end-start > 45:
                 terminal = True
-                reward = -5000
+                reward = -1
 
             if terminal:
                 print("ROUND ENDED")
@@ -116,5 +117,6 @@ def main():
 if __name__ == '__main__':
     # Initialize the SummaryWriter for TensorBoard
     # Its output will be written to ./runs/
-    writer = SummaryWriter(log_dir='./runs/ppomodel1', comment="LR_1e-6, batchSize32, gaussian noise")
+    writer = SummaryWriter(log_dir='./runs/ppomodel2', comment="LR_3e-4, batchSize32")
     main()
+    torch.save(actor_critic_net.state_dict(), './saved_models/ppomodel2')

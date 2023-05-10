@@ -69,8 +69,8 @@ class PPOTrainer():
               target_kl_div=0.01,
               max_policy_train_iters=80,
               value_train_iters=80,
-              policy_lr=3e-3,
-              value_lr=1e-2):
+              policy_lr=3e-4,
+              value_lr=1e-3):
     self.ac = actor_critic
     self.ppo_clip_val = ppo_clip_val
     self.target_kl_div = target_kl_div

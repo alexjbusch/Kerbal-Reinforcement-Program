@@ -316,72 +316,99 @@ class Game:
         is_terminal = False
 
         parts_destroyed = self.num_ship_parts - len(self.vessel.parts.all)
-        
-        # new_reward = parts_destroyed * -20
-        new_reward = None
-        if self.vessel.situation == self.conn.space_center.VesselSituation.landed:
-            if self.landed_counter == None:
-                self.landed_counter = 0
-            self.landed_counter += 1
-            
-            if self.landed_counter > 0:
-                is_terminal = True
-                new_reward = 10000
-        # else:
-        #     self.landed_counter = 0
+
+        new_reward = 0
 
         if parts_destroyed > 0:
             is_terminal = True
-            new_reward = -5000
+            new_reward -= 1
+            
+        # new_reward = parts_destroyed * -20
+        
+        state_variables = {key: value.item() for key, value in zip(OBS, s)}
+        velocity_vector = [state_variables["velocity_x"], state_variables["velocity_y"],
+                            state_variables["velocity_z"]]
+        velocity = utils.list_magnitude(velocity_vector)
+
+        altitude = state_variables["altitude"]
+        vessel_speed_relative_to_mun = self.vessel.orbit.speed
+        velocity = vessel_speed_relative_to_mun
+
+        if altitude > 6000:
+            is_terminal = True
+            new_reward -= 1
 
         if not is_terminal:
-            state_variables = {key: value.item() for key, value in zip(OBS, s)}
-            velocity_vector = [state_variables["velocity_x"], state_variables["velocity_y"],
-                               state_variables["velocity_z"]]
-            velocity = utils.list_magnitude(velocity_vector)
+            new_reward = 0
 
-            altitude = state_variables["altitude"]
-            vessel_speed_relative_to_mun = self.vessel.orbit.speed
-            velocity = vessel_speed_relative_to_mun
-            acceleration = velocity - self.prev_vel
-            self.prev_vel = vessel_speed_relative_to_mun
+            # acceleration = velocity - self.prev_vel
+            # self.prev_vel = vessel_speed_relative_to_mun
+            
+            
+            
+            if altitude < 100:
+                new_reward += 20
+                
+
+                if self.vessel.situation == self.conn.space_center.VesselSituation.landed:
+                    new_reward += 100
+                    is_terminal = True
+                
+                if velocity == 0:
+                    new_reward += 20
+        # else:
+        #     self.landed_counter = 0
+
+        
+
+        # if not is_terminal:
+        #     state_variables = {key: value.item() for key, value in zip(OBS, s)}
+        #     velocity_vector = [state_variables["velocity_x"], state_variables["velocity_y"],
+        #                        state_variables["velocity_z"]]
+        #     velocity = utils.list_magnitude(velocity_vector)
+
+        #     altitude = state_variables["altitude"]
+        #     vessel_speed_relative_to_mun = self.vessel.orbit.speed
+        #     velocity = vessel_speed_relative_to_mun
+        #     acceleration = velocity - self.prev_vel
+        #     self.prev_vel = vessel_speed_relative_to_mun
             
 
-            velocity_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
+        #     velocity_reward = 10*(1/vessel_speed_relative_to_mun)**0.5
 
-            if self.prev_alt == None:
-                self.prev_alt = altitude
-                distance_reward = (1/altitude)**0.5
-            else:
-                delta_altitude = (self.prev_alt - altitude)
-                self.prev_delta_alt = delta_altitude
-                self.prev_alt = altitude
+        #     if self.prev_alt == None:
+        #         self.prev_alt = altitude
+        #         distance_reward = (1/altitude)**0.5
+        #     else:
+        #         delta_altitude = (self.prev_alt - altitude)
+        #         self.prev_delta_alt = delta_altitude
+        #         self.prev_alt = altitude
 
-                if delta_altitude < 0:
-                    distance_reward = delta_altitude
-                else:
-                    distance_reward = delta_altitude * (1/altitude)**0.5
+        #         if delta_altitude < 0:
+        #             distance_reward = delta_altitude
+        #         else:
+        #             distance_reward = delta_altitude * (1/altitude)**0.5
 
 
-            new_reward = velocity_reward + distance_reward
+        #     new_reward = velocity_reward + distance_reward
 
-            if altitude > 4000:
-                is_terminal = True
-                new_reward = -200
+        #     if altitude > 4000:
+        #         is_terminal = True
+        #         new_reward = -200
             
-            # if altitude > 2000:
-            #     new_reward = velocity_reward + 40 * distance_reward
-            # else:
-            #     if altitude < 10:
-            #         new_reward = 200*vessel_speed_relative_to_mun
-            #     else:
-            #         new_reward = -20
+        #     # if altitude > 2000:
+        #     #     new_reward = velocity_reward + 40 * distance_reward
+        #     # else:
+        #     #     if altitude < 10:
+        #     #         new_reward = 200*vessel_speed_relative_to_mun
+        #     #     else:
+        #     #         new_reward = -20
             
-            if altitude > 2000:
-                new_reward = velocity_reward + 40 * distance_reward
-            else:
-                new_reward = 20*velocity_reward + distance_reward
-            # print("alt: ", altitude)
+        #     if altitude > 2000:
+        #         new_reward = velocity_reward + 40 * distance_reward
+        #     else:
+        #         new_reward = 20*velocity_reward + distance_reward
+        #     # print("alt: ", altitude)
          
             # print("altitude change", delta_altitude)
         #     print("distance_reward",distance_reward)
@@ -398,9 +425,9 @@ class Game:
         return new_reward, is_terminal
     def load(self):
         try:
-            self.conn.space_center.load('5k_mun_falling')
+            self.conn.space_center.load('10k_mun_falling')
         except ValueError:
-            self.conn.space_center.load('5k mun falling')
+            self.conn.space_center.load('10 k mun falling')
         
 
     
